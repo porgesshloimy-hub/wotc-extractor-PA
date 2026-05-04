@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WOTC EDI Extractor</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F5F4F0;
+  --surface:#FFFFFF;
+  --surface2:#EFEDE8;
+  --border:#DDD9D0;
+  --border2:#C9C5BC;
+  --text:#18170F;
+  --text2:#6A675E;
+  --text3:#A09D96;
+  --accent:#2B5C3F;
+  --accent-lt:#EAF2EC;
+  --accent-btn:#234D34;
+  --ok:#1A5C2E;
+  --ok-bg:#E8F5ED;
+  --ok-border:#B4D9C0;
+  --warn:#7A4F1A;
+  --warn-bg:#FDF3E7;
+  --warn-border:#E8C88A;
+  --err:#8B1A1A;
+  --err-bg:#FDF0F0;
+  --err-border:#E8B4B4;
+  --proc:#1E3A8A;
+  --proc-bg:#EFF6FF;
+  --r:10px;--r-sm:7px;--r-xs:5px;
+  --shadow:0 1px 3px rgba(0,0,0,0.07),0 4px 20px rgba(0,0,0,0.05);
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+a{color:var(--accent)}
+
+/* ── Layout ── */
+.page{max-width:740px;margin:0 auto;padding:2.5rem 1.5rem 5rem}
+@media(max-width:600px){.page{padding:1.5rem 1rem 4rem}}
+
+/* ── Header ── */
+.hdr{margin-bottom:2rem;padding-bottom:1.75rem;border-bottom:1.5px solid var(--border)}
+.hdr-eyebrow{font-size:11px;letter-spacing:0.13em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.hdr-dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.hdr-title{font-family:'DM Serif Display',serif;font-size:clamp(24px,5vw,32px);color:var(--text);margin-bottom:8px;line-height:1.2}
+.hdr-sub{font-size:14px;color:var(--text2);line-height:1.65;max-width:520px}
+.badge-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px}
+.badge{font-size:11px;font-weight:500;padding:4px 10px;border-radius:20px;background:var(--surface);color:var(--text2);border:1px solid var(--border);display:flex;align-items:center;gap:5px}
+.badge-dot{width:5px;height:5px;border-radius:50%}
+
+/* ── Card ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:1rem;overflow:hidden;box-shadow:var(--shadow)}
+.card-hd{padding:1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}
+.card-hd:hover{background:var(--surface2)}
+.card-hd-left{display:flex;align-items:center;gap:11px}
+.card-icon{width:34px;height:34px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.card-title{font-size:14px;font-weight:600;color:var(--text)}
+.card-subtitle{font-size:12px;color:var(--text3);margin-top:1px}
+.card-toggle{font-size:20px;color:var(--text3);transition:transform 0.25s;line-height:1}
+.card-toggle.open{transform:rotate(180deg)}
+.card-bd{padding:1.25rem}
+.card-bd.hidden{display:none}
+
+/* ── Field table ── */
+.field-scroll{max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px}
+.field-row{display:grid;grid-template-columns:36px 1fr auto;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--border)}
+.field-row:last-child{border-bottom:none}
+.field-row:nth-child(even){background:var(--surface2)}
+.fcol{font-weight:700;color:var(--text3);font-size:10px;font-family:monospace}
+.fname{color:var(--text);line-height:1.4}
+.freq{font-size:10px;font-weight:600;color:var(--ok);background:var(--ok-bg);padding:2px 6px;border-radius:4px;white-space:nowrap}
+
+/* ── Upload ── */
+.notice{background:var(--warn-bg);border:1px solid var(--warn-border);border-radius:var(--r-sm);padding:10px 13px;font-size:12.5px;color:var(--warn);line-height:1.55;margin-bottom:1rem;display:flex;gap:9px;align-items:flex-start}
+.drop-zone{border:2px dashed var(--border2);border-radius:var(--r);padding:2.25rem 1rem;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--surface2);-webkit-tap-highlight-color:transparent}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--accent);background:var(--accent-lt)}
+.drop-zone input{display:none}
+.drop-icon{font-size:32px;margin-bottom:10px;line-height:1}
+.drop-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:5px}
+.drop-sub{font-size:13px;color:var(--text2)}
+.drop-sub span{color:var(--accent);font-weight:500}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.chip{display:inline-flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:5px 8px 5px 12px;font-size:12px;color:var(--text);max-width:100%}
+.chip-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px}
+.chip-rm{background:none;border:none;cursor:pointer;color:var(--text3);font-size:17px;line-height:1;padding:0 2px;display:flex;align-items:center;border-radius:50%;transition:color 0.15s}
+.chip-rm:hover{color:var(--err)}
+
+/* ── Progress ── */
+.prog-wrap{margin-top:12px;display:none}
+.prog-meta{display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:5px}
+.prog-bar{height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;border:1px solid var(--border)}
+.prog-fill{height:100%;background:var(--accent);border-radius:2px;transition:width 0.35s ease;width:0%}
+
+/* ── Buttons ── */
+.btn{width:100%;padding:13px;border:none;border-radius:var(--r-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;letter-spacing:0.01em;transition:all 0.15s;margin-top:.75rem;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn:disabled{opacity:0.35;cursor:not-allowed}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:not(:disabled):hover{background:var(--accent-btn)}
+.btn-dl{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-border)}
+.btn-dl:hover{background:#D6EDDF}
+.btn-sm{width:auto;padding:8px 16px;font-size:13px;margin-top:0}
+
+/* ── Results ── */
+.results-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:gap}
+.results-title{font-size:14px;font-weight:600}
+.results-count{font-size:12px;color:var(--text2)}
+.rec{border:1px solid var(--border);border-radius:var(--r-sm);margin-bottom:8px;overflow:hidden}
+.rec-hd{display:flex;align-items:center;gap:9px;padding:10px 13px;background:var(--surface2);flex-wrap:wrap;gap:6px}
+.tag{font-size:11px;font-weight:600;padding:3px 9px;border-radius:4px;flex-shrink:0;white-space:nowrap}
+.tag-ok{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-border)}
+.tag-err{background:var(--err-bg);color:var(--err);border:1px solid var(--err-border)}
+.tag-proc{background:var(--proc-bg);color:var(--proc);border:1px solid #BFDBFE}
+.rec-name{font-size:14px;font-weight:600;flex:1;min-width:120px}
+.rec-file{font-size:11px;color:var(--text3);margin-left:auto}
+.rec-bd{padding:12px 13px}
+.kv-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:480px){.kv-grid{grid-template-columns:1fr}}
+.kv{display:flex;flex-direction:column;gap:2px}
+.kv-k{font-size:10px;letter-spacing:0.07em;text-transform:uppercase;color:var(--text3);font-weight:500}
+.kv-v{font-size:13px;font-weight:500;color:var(--text)}
+.rec-more{font-size:11px;color:var(--text3);margin-top:10px;padding-top:8px;border-top:1px solid var(--border)}
+.rec-err-msg{font-size:13px;color:var(--text2);line-height:1.6}
+.rec-err-hint{font-size:12px;color:var(--text3);margin-top:6px;line-height:1.5}
+
+/* ── Divider ── */
+.divider{border:none;border-top:1px solid var(--border);margin:1.25rem 0}
+
+/* ── Footer ── */
+.footer{margin-top:2.5rem;padding-top:1.25rem;border-top:1px solid var(--border);font-size:12px;color:var(--text3);line-height:1.6;text-align:center}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="hdr">
+    <div class="hdr-eyebrow"><span class="hdr-dot"></span> CWDS · EDI Upload Tool</div>
+    <h1 class="hdr-title">WOTC Form 8850<br>→ EDI CSV Extractor</h1>
+    <p class="hdr-sub">Upload completed Form 8850 PDFs. All 67 EDI fields are extracted automatically and exported as a ready-to-upload CSV file — no headers, exact column order.</p>
+    <div class="badge-row">
+      <div class="badge"><span class="badge-dot" style="background:var(--ok)"></span>67 EDI fields</div>
+      <div class="badge"><span class="badge-dot" style="background:var(--accent)"></span>No header row</div>
+      <div class="badge"><span class="badge-dot" style="background:#7C3AED"></span>AI-powered extraction</div>
+      <div class="badge"><span class="badge-dot" style="background:#B45309"></span>Requires internet</div>
+    </div>
+  </div>
+
+  <!-- Field reference (collapsed by default) -->
+  <div class="card">
+    <div class="card-hd" onclick="toggleCard('fields')">
+      <div class="card-hd-left">
+        <div class="card-icon">📋</div>
+        <div>
+          <div class="card-title">EDI Field Reference</div>
+          <div class="card-subtitle">Columns A–BO · 67 fields · exact output order</div>
+        </div>
+      </div>
+      <div class="card-toggle" id="tog-fields">▾</div>
+    </div>
+    <div class="card-bd hidden" id="bd-fields">
+      <div class="field-scroll" id="fieldList"></div>
+    </div>
+  </div>
+
+  <!-- Upload -->
+  <div class="card">
+    <div class="card-hd" onclick="toggleCard('upload')">
+      <div class="card-hd-left">
+        <div class="card-icon">📂</div>
+        <div>
+          <div class="card-title">Upload Forms</div>
+          <div class="card-subtitle" id="uploadSubtitle">No files selected</div>
+        </div>
+      </div>
+      <div class="card-toggle open" id="tog-upload">▾</div>
+    </div>
+    <div class="card-bd" id="bd-upload">
+      <div class="notice">
+        <span>⚠</span>
+        <span>Do not submit duplicate records. Do not mail paper copies if submitting via EDI. Max file size per upload session: 100 KB.</span>
+      </div>
+      <div class="drop-zone" id="dropZone"
+        onclick="document.getElementById('fileInput').click()"
+        ondragover="ev.preventDefault();this.classList.add('drag-over')"
+        ondragleave="this.classList.remove('drag-over')"
+        ondrop="handleDrop(event)">
+        <input type="file" id="fileInput" multiple accept=".pdf" onchange="addFiles(this.files)">
+        <div class="drop-icon">📄</div>
+        <div class="drop-title">Click to select PDF files</div>
+        <div class="drop-sub">Or drag and drop here · <span>No file limit</span> · Form 8850 PDFs only</div>
+      </div>
+      <div class="chips" id="chips"></div>
+    </div>
+  </div>
+
+  <!-- Run -->
+  <button class="btn btn-primary" id="runBtn" disabled onclick="runAll()">
+    <span id="runLabel">⚡ Extract all &amp; build CSV</span>
+  </button>
+
+  <div class="prog-wrap" id="progWrap">
+    <div class="prog-meta">
+      <span id="progLabel">Processing…</span>
+      <span id="progPct">0%</span>
+    </div>
+    <div class="prog-bar"><div class="prog-fill" id="progFill"></div></div>
+  </div>
+
+  <!-- Results -->
+  <div id="resultsSection" style="display:none;margin-top:1.25rem">
+    <div class="card">
+      <div class="card-hd" onclick="toggleCard('results')">
+        <div class="card-hd-left">
+          <div class="card-icon">✅</div>
+          <div>
+            <div class="card-title">Extracted Records</div>
+            <div class="card-subtitle" id="resultsSub">—</div>
+          </div>
+        </div>
+        <div class="card-toggle open" id="tog-results">▾</div>
+      </div>
+      <div class="card-bd" id="bd-results">
+        <div id="recList"></div>
+        <hr class="divider">
+        <button class="btn btn-dl" onclick="downloadCSV()">⬇ Download CSV — EDI ready, no headers</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    CWDS WOTC EDI Upload Instructions v3.0 · 12/08/2017<br>
+    Requires internet connection for AI extraction · Data is not stored
+  </div>
+
+</div>
+
+<script>
+// ── Field definitions (A–BO) ──
+const FIELDS = [
+  {col:"A",  name:"Employer FEIN",                          key:"employer_fein",       req:true},
+  {col:"B",  name:"Employer Name",                          key:"employer_name",       req:true},
+  {col:"C",  name:"Employer Address Line 1",                key:"employer_addr1",      req:true},
+  {col:"D",  name:"Employer Address Line 2",                key:"employer_addr2",      req:false},
+  {col:"E",  name:"Employer City",                          key:"employer_city",       req:true},
+  {col:"F",  name:"Employer State",                         key:"employer_state",      req:true},
+  {col:"G",  name:"Employer Zip Code",                      key:"employer_zip",        req:true},
+  {col:"H",  name:"SSN (XXX-XX-XXXX)",                      key:"ssn",                 req:true},
+  {col:"I",  name:"First Name",                             key:"first_name",          req:true},
+  {col:"J",  name:"Last Name",                              key:"last_name",           req:true},
+  {col:"K",  name:"Middle Initial",                         key:"middle_initial",      req:false},
+  {col:"L",  name:"Birth Date (MM/DD/YYYY)",                key:"birth_date",          req:true},
+  {col:"M",  name:"Employee Address Line 1",                key:"emp_addr1",           req:true},
+  {col:"N",  name:"Employee Address Line 2",                key:"emp_addr2",           req:false},
+  {col:"O",  name:"Employee City",                          key:"emp_city",            req:true},
+  {col:"P",  name:"Employee State",                         key:"emp_state",           req:true},
+  {col:"Q",  name:"Employee Zip Code",                      key:"emp_zip",             req:true},
+  {col:"R",  name:"Employee County Code",                   key:"emp_county",          req:false},
+  {col:"S",  name:"Member of Group 4 or 6",                 key:"group_4_6",           req:false},
+  {col:"T",  name:"Gave Information Date",                  key:"gave_info_date",      req:false},
+  {col:"U",  name:"Job Offered Date",                       key:"job_offered_date",    req:false},
+  {col:"V",  name:"Hire Date (MM/DD/YYYY)",                 key:"hire_date",           req:true},
+  {col:"W",  name:"Start Date (MM/DD/YYYY)",                key:"start_date",          req:true},
+  {col:"X",  name:"Start Wage",                             key:"start_wage",          req:true},
+  {col:"Y",  name:"Occupation Type Code",                   key:"occupation_code",     req:true},
+  {col:"Z",  name:"Q1 [0=No / 1=Yes]",                     key:"q1",                  req:false},
+  {col:"AA", name:"Q2 [0=No / 1=Yes]",                     key:"q2",                  req:false},
+  {col:"AB", name:"Q3 [0=No / 1=Yes]",                     key:"q3",                  req:false},
+  {col:"AC", name:"Q4 [0=No / 1=Yes]",                     key:"q4",                  req:false},
+  {col:"AD", name:"Q5 [0=No / 1=Yes]",                     key:"q5",                  req:false},
+  {col:"AE", name:"Q6 [0=No / 1=Yes]",                     key:"q6",                  req:false},
+  {col:"AF", name:"Q7 [0=No / 1=Yes]",                     key:"q7",                  req:false},
+  {col:"AG", name:"Worked Before [0/1]",                    key:"worked_before",       req:true},
+  {col:"AH", name:"Last Date of Employment",                key:"last_emp_date",       req:false},
+  {col:"AI", name:"Age 16–39 [0/1]",                        key:"age_16_40",           req:true},
+  {col:"AJ", name:"Veteran Q13 [0/1]",                      key:"veteran",             req:true},
+  {col:"AK", name:"SNAP 3/15 Vet Q13.1 [0/1]",             key:"snap_vet",            req:false},
+  {col:"AL", name:"Disability Veteran Q13.2 [0/1]",         key:"disability_vet",      req:false},
+  {col:"AM", name:"Discharged Vet <1yr Q13.3 [0/1]",        key:"discharged_vet",      req:false},
+  {col:"AN", name:"Unemp Vet 6mo Q13.4 [0/1]",              key:"unemp_vet_6mo",       req:false},
+  {col:"AO", name:"SNAP Last 6 Q14 [0/1]",                  key:"snap_last6",          req:true},
+  {col:"AP", name:"SNAP 3/5 Q14.1 [0/1]",                   key:"snap_3of5",           req:true},
+  {col:"AQ", name:"OVR Q15 [0/1]",                          key:"ovr",                 req:true},
+  {col:"AR", name:"Ticket to Work Q15.1 [0/1]",             key:"ticket_work",         req:true},
+  {col:"AS", name:"VA Q15.2 [0/1]",                         key:"va",                  req:true},
+  {col:"AT", name:"TANF Last 18 Q16 [0/1]",                 key:"tanf_last18",         req:true},
+  {col:"AU", name:"TANF Any 18 Q16.1 [0/1]",                key:"tanf_any18",          req:true},
+  {col:"AV", name:"TANF Stopped Q16.2 [0/1]",               key:"tanf_stopped",        req:true},
+  {col:"AW", name:"TANF 9/18 Q16.3 [0/1]",                  key:"tanf_9_18",           req:true},
+  {col:"AX", name:"Ex-Felon Q17 [0/1]",                     key:"ex_felon",            req:true},
+  {col:"AY", name:"Conviction Date Q17.1",                   key:"conviction_date",     req:false},
+  {col:"AZ", name:"Release Date Q17.1",                      key:"release_date",        req:false},
+  {col:"BA", name:"Federal/State Conv Q17.2 [0=State/1=Fed]",key:"fed_state_conv",     req:false},
+  {col:"BB", name:"EZ or RRC Q18 [0/1]",                    key:"ez_rrc",              req:true},
+  {col:"BC", name:"RRC Code Q18",                            key:"rrc_code",            req:false},
+  {col:"BD", name:"Summer Youth Q19 [0/1]",                  key:"summer_youth",        req:true},
+  {col:"BE", name:"SSI Q20 [0/1]",                          key:"ssi",                 req:true},
+  {col:"BF", name:"Unemp Vet 6mo/1yr Q21 [0/1]",            key:"unemp_vet_6in1",      req:false},
+  {col:"BG", name:"Unemp Vet 4wk<6mo Q22 [0/1]",            key:"unemp_vet_4wk",       req:false},
+  {col:"BH", name:"Long Term Unemp 27wk Q23 [0/1]",         key:"ltu_27wk",            req:true},
+  {col:"BI", name:"UC Benefits State Q23.1",                 key:"uc_state",            req:false},
+  {col:"BJ", name:"Sources",                                 key:"sources",             req:false},
+  {col:"BK", name:"Out of State [0/1]",                      key:"out_of_state",        req:false},
+  {col:"BL", name:"OOS State",                               key:"oos_state",           req:false},
+  {col:"BM", name:"Primary Recipient",                       key:"primary_recipient",   req:false},
+  {col:"BN", name:"Employer Signature Date",                 key:"employer_sig_date",   req:true},
+  {col:"BO", name:"Employee Signature Date",                 key:"employee_sig_date",   req:true},
+];
+
+const OCC_CODES = {
+  "architecture":17,"engineering":17,"arts":27,"design":27,"entertainment":27,"sports":27,"media":27,
+  "building":37,"grounds":37,"cleaning":37,"maintenance":37,"business":13,"financial":13,
+  "community":21,"social services":21,"computer":15,"mathematical":15,"construction":47,"extraction":47,
+  "education":25,"training":25,"library":25,"farming":45,"fishing":45,"forestry":45,
+  "food":35,"serving":35,"healthcare practitioner":29,"healthcare support":31,
+  "installation":49,"repair":49,"legal":23,"science":19,"management":11,"military":55,
+  "office":43,"administrative":43,"personal care":39,"service":39,"production":51,
+  "protective":33,"sales":41,"transportation":53,"material moving":53
+};
+
+// Render field list
+const fl = document.getElementById('fieldList');
+FIELDS.forEach(f => {
+  const r = document.createElement('div'); r.className='field-row';
+  r.innerHTML=`<span class="fcol">${f.col}</span><span class="fname">${f.name}</span>${f.req?'<span class="freq">REQ</span>':'<span></span>'}`;
+  fl.appendChild(r);
+});
+
+// Card toggle
+function toggleCard(id){
+  const bd=document.getElementById('bd-'+id);
+  const tog=document.getElementById('tog-'+id);
+  const hidden=bd.classList.toggle('hidden');
+  tog.classList.toggle('open',!hidden);
+}
+
+// File handling
+let files=[], allRecords=[];
+
+function handleDrop(e){
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('drag-over');
+  addFiles(e.dataTransfer.files);
+}
+
+function addFiles(newFiles){
+  Array.from(newFiles).forEach(f=>{
+    if(f.type==='application/pdf' && !files.find(x=>x.name===f.name)) files.push(f);
+  });
+  renderChips();
+  updateUploadSubtitle();
+  document.getElementById('runBtn').disabled=files.length===0;
+}
+
+function removeFile(i){
+  files.splice(i,1); renderChips(); updateUploadSubtitle();
+  document.getElementById('runBtn').disabled=files.length===0;
+}
+
+function renderChips(){
+  const c=document.getElementById('chips'); c.innerHTML='';
+  files.forEach((f,i)=>{
+    const chip=document.createElement('span'); chip.className='chip';
+    chip.innerHTML=`<span class="chip-name" title="${f.name}">${f.name}</span><button class="chip-rm" onclick="removeFile(${i})">×</button>`;
+    c.appendChild(chip);
+  });
+}
+
+function updateUploadSubtitle(){
+  document.getElementById('uploadSubtitle').textContent=
+    files.length===0 ? 'No files selected' :
+    files.length===1 ? '1 file selected' :
+    `${files.length} files selected`;
+}
+
+// Progress
+function setProgress(done,total){
+  const p=document.getElementById('progWrap');
+  p.style.display='block';
+  const pct=total===0?0:Math.round((done/total)*100);
+  document.getElementById('progFill').style.width=pct+'%';
+  document.getElementById('progPct').textContent=pct+'%';
+  document.getElementById('progLabel').textContent=
+    done<total ? `Processing ${done+1} of ${total}…` : `Done — ${done} of ${total} processed`;
+}
+
+// Base64
+async function toB64(file){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(r.result.split(',')[1]);
+    r.onerror=()=>rej(new Error('read failed'));
+    r.readAsDataURL(file);
+  });
+}
+
+// Extract one PDF
+async function extractOne(file){
+  const b64=await toB64(file);
+  const prompt=`You are a precise data extraction engine for IRS Form 8850 (WOTC pre-screening notice) and its companion ICF intake form.
+
+The PDF may have 1–2 pages. Page 1 is the IRS Form 8850. Page 2 (if present) is a companion ICF questionnaire with numbered yes/no questions about SNAP, TANF, SSI, veteran status, felony, unemployment, etc.
+
+Extract all data and return ONLY a raw JSON object — no markdown, no backticks, no explanation.
+
+FORMAT RULES:
+- Dates: MM/DD/YYYY (convert any format found)
+- SSN: XXX-XX-XXXX with leading zeros preserved (e.g. 023-45-6789)
+- Yes/No questions: 1=Yes, 0=No, ""=not present/not applicable
+- occupation_code: numeric code only. Map job title to: Architecture/Engineering=17, Arts/Design/Entertainment/Sports/Media=27, Building/Grounds/Cleaning/Maintenance=37, Business/Financial=13, Community/Social Services=21, Computer/Math=15, Construction/Extraction=47, Education/Training/Library=25, Farming/Fishing/Forestry=45, Food Prep/Serving=35, Healthcare Practitioner=29, Healthcare Support=31, Installation/Maintenance/Repair=49, Legal=23, Life/Physical/Social Science=19, Management=11, Military=55, Office/Admin Support=43, Personal Care/Service=39, Production=51, Protective Service=33, Sales=41, Transportation/Material Moving=53. If unknown use 43.
+- start_wage: numeric only (e.g. 15.00), no dollar sign
+- employer_fein: digits only, 9 digits
+- For any field not found: return ""
+
+FIELD MAPPING NOTES:
+- "Worked Before" (AG): Q1 on companion form "Have you worked for this employer before?"
+- snap_last6 (AO): Q2a on companion — SNAP last 6 months
+- snap_3of5 (AP): Q2b on companion — SNAP 3 of past 5 months
+- tanf_last18 (AT): Q3a — TANF last 18 months
+- tanf_any18 (AU): Q3b — TANF any 18 months after 8/5/1997
+- tanf_stopped (AV): Q3c — stopped TANF due to time limit
+- tanf_9_18 (AW): Q3d — TANF 9 of past 18 months
+- ssi (BE): Q4 — SSI benefits
+- ltu_27wk (BH): Q5 — unemployed 27+ weeks with UC
+- uc_state (BI): Q5 follow-up — state of UC benefits
+- ticket_work (AR): Q6a — Ticket to Work referral
+- ovr (AQ): Q6b — Vocational Rehab referral
+- va (AS): Q6c — VA referral
+- ex_felon (AX): Q7 — felony conviction/release
+- conviction_date (AY): Q7 conviction date
+- release_date (AZ): Q7 release date
+- fed_state_conv (BA): Q7 Federal(1) or State(0)
+- veteran (AJ): Q8a — is veteran
+- snap_vet (AK): Q8b — veteran SNAP 3/15
+- unemp_vet_4wk (BG): Q8c — veteran unemployed 4+ weeks
+- primary_recipient: name from Q2 or Q3 or Q8 if provided
+- out_of_state: 1 if benefits received out of PA, else 0
+- oos_state: state abbreviation if out of state
+
+Return this exact JSON structure:
+{"employer_fein":"","employer_name":"","employer_addr1":"","employer_addr2":"","employer_city":"","employer_state":"","employer_zip":"","ssn":"","first_name":"","last_name":"","middle_initial":"","birth_date":"","emp_addr1":"","emp_addr2":"","emp_city":"","emp_state":"","emp_zip":"","emp_county":"","group_4_6":"","gave_info_date":"","job_offered_date":"","hire_date":"","start_date":"","start_wage":"","occupation_code":"","q1":"","q2":"","q3":"","q4":"","q5":"","q6":"","q7":"","worked_before":"","last_emp_date":"","age_16_40":"","veteran":"","snap_vet":"","disability_vet":"","discharged_vet":"","unemp_vet_6mo":"","snap_last6":"","snap_3of5":"","ovr":"","ticket_work":"","va":"","tanf_last18":"","tanf_any18":"","tanf_stopped":"","tanf_9_18":"","ex_felon":"","conviction_date":"","release_date":"","fed_state_conv":"","ez_rrc":"","rrc_code":"","summer_youth":"","ssi":"","unemp_vet_6in1":"","unemp_vet_4wk":"","ltu_27wk":"","uc_state":"","sources":"","out_of_state":"","oos_state":"","primary_recipient":"","employer_sig_date":"","employee_sig_date":""}`;
+
+  const resp=await fetch('https://royal-bird-83c5.porgesshloimy.workers.dev/',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      model:'claude-sonnet-4-6',
+      max_tokens:1500,
+      messages:[{role:'user',content:[
+        {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},
+        {type:'text',text:prompt}
+      ]}]
+    })
+  });
+
+  if(!resp.ok) throw new Error(`API error ${resp.status}`);
+  const data=await resp.json();
+  if(data.error) throw new Error(data.error.message||'API error');
+  const raw=data.content.map(c=>c.text||'').join('').replace(/```json|```/g,'').trim();
+  const parsed=JSON.parse(raw);
+
+  // Format SSN with dashes if missing
+  if(parsed.ssn){
+    const digits=parsed.ssn.replace(/\D/g,'');
+    if(digits.length===9) parsed.ssn=`${digits.slice(0,3)}-${digits.slice(3,5)}-${digits.slice(5)}`;
+  }
+
+  return parsed;
+}
+
+// Run all
+async function runAll(){
+  const btn=document.getElementById('runBtn');
+  btn.disabled=true;
+  document.getElementById('runLabel').textContent='⏳ Extracting…';
+  allRecords=[];
+  document.getElementById('resultsSection').style.display='none';
+
+  for(let i=0;i<files.length;i++){
+    setProgress(i,files.length);
+    try{
+      const data=await extractOne(files[i]);
+      allRecords.push({file:files[i].name,status:'ok',data});
+    }catch(e){
+      allRecords.push({file:files[i].name,status:'error',data:null,err:e.message});
+    }
+  }
+
+  setProgress(files.length,files.length);
+  renderResults();
+  btn.disabled=false;
+  document.getElementById('runLabel').textContent='⚡ Extract all & build CSV';
+}
+
+// Render results
+function renderResults(){
+  const list=document.getElementById('recList'); list.innerHTML='';
+  const ok=allRecords.filter(r=>r.status==='ok').length;
+  document.getElementById('resultsSub').textContent=
+    `${ok} of ${allRecords.length} extracted successfully`;
+
+  allRecords.forEach(r=>{
+    const rec=document.createElement('div'); rec.className='rec';
+
+    if(r.status==='error'){
+      rec.innerHTML=`
+        <div class="rec-hd">
+          <span class="tag tag-err">Error</span>
+          <span class="rec-name">${r.file}</span>
+        </div>
+        <div class="rec-bd">
+          <div class="rec-err-msg">Could not extract data from this file.</div>
+          <div class="rec-err-hint">
+            Make sure this is a completed Form 8850 PDF (not the instructions document).<br>
+            ${r.err?'Detail: '+r.err:''}
+          </div>
+        </div>`;
+    } else {
+      const d=r.data;
+      const name=[d.first_name,d.middle_initial,d.last_name].filter(Boolean).join(' ')||'(name not found)';
+      rec.innerHTML=`
+        <div class="rec-hd">
+          <span class="tag tag-ok">Extracted</span>
+          <span class="rec-name">${name}</span>
+          <span class="rec-file">${r.file}</span>
+        </div>
+        <div class="rec-bd">
+          <div class="kv-grid">
+            <div class="kv"><span class="kv-k">SSN</span><span class="kv-v">${d.ssn||'—'}</span></div>
+            <div class="kv"><span class="kv-k">Date of Birth</span><span class="kv-v">${d.birth_date||'—'}</span></div>
+            <div class="kv"><span class="kv-k">Hire Date</span><span class="kv-v">${d.hire_date||'—'}</span></div>
+            <div class="kv"><span class="kv-k">Start Wage</span><span class="kv-v">${d.start_wage?'$'+d.start_wage:'—'}</span></div>
+            <div class="kv"><span class="kv-k">Employee Address</span><span class="kv-v">${[d.emp_addr1,d.emp_city,d.emp_state].filter(Boolean).join(', ')||'—'}</span></div>
+            <div class="kv"><span class="kv-k">Employer</span><span class="kv-v">${d.employer_name||'—'}</span></div>
+          </div>
+          <div class="rec-more">All 67 EDI fields included in the CSV download</div>
+        </div>`;
+    }
+    list.appendChild(rec);
+  });
+
+  document.getElementById('resultsSection').style.display='block';
+}
+
+// CSV download — no headers per EDI spec
+function csvCell(v){
+  const s=(v===null||v===undefined)?'':String(v);
+  if(s.includes(',')||s.includes('"')||s.includes('\n')) return `"${s.replace(/"/g,'""')}"`;
+  return s;
+}
+
+function downloadCSV(){
+  const rows=allRecords
+    .filter(r=>r.status==='ok')
+    .map(r=>FIELDS.map(f=>csvCell(r.data[f.key])).join(','));
+  if(rows.length===0){alert('No successfully extracted records to export.');return;}
+  const csv=rows.join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`wotc_edi_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
